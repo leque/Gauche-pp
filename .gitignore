@@ -1,0 +1,4 @@
+*.gpd
+*.log
+Makefile
+VERSION
