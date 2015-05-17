@@ -83,6 +83,25 @@
     pp-break?
   (alternative pp-break-alternative))
 
+(define-record-type <pp-context>
+    %make-pp-context
+    pp-context?
+  ;; the current datum label count
+  (count pp-context-count pp-context-count-set!)
+  ;; obj * int mappings.
+  ;; If a value n > 0, it means number of times an obj was seen in scan path.
+  ;; If n <= 0, -n means a datum label for an obj in print path.
+  (hash-table pp-context-hash-table))
+
+(define (make-pp-context)
+  (%make-pp-context 0 (make-hash-table)))
+
+(define (pp-context-clear! ctx)
+  ;; clear the hash-table for GC friendliness.
+  ;; See also cleanup_port_context in Gauche/src/write.c
+  (hash-table-clear! (pp-context-hash-table ctx))
+  (pp-context-count-set! ctx 0))
+
 ;;; API: Create a pretty-print group.
 (define (pp-group . args)
   (make-pp-group args))
@@ -111,10 +130,13 @@
    ((obj port width)
     (let ((port (or port (current-output-port)))
           (width (or width 78))
-          (pp (x->pp obj)))
-      (write-tree (pp-make-tree width 0 (list (state 0 'flat pp)))
-                  port)
-      (newline port)))))
+          (ctx (make-pp-context)))
+      (pp-scan! obj ctx)
+      (let ((pp (x->pp obj ctx)))
+        (write-tree (pp-make-tree width 0 (list (state 0 'flat pp)))
+                    port)
+        (newline port)
+        (pp-context-clear! ctx))))))
 
 ;;; API: Format rules for a specific list structure.
 ;;; A hashtable whose keys are symbols of a car of a list and
@@ -130,46 +152,103 @@
 (define (pp-sp-breakable xs)
   (intersperse <> xs))
 
-(define (pp/sep sep xs)
-  (intersperse <> (map x->pp xs)))
+(define (pp/sep ctx sep xs)
+  (intersperse <> (map (cut x->pp <> ctx) xs)))
 
 ;;; API: convert an object to a pretty-print document.
 ;;; You can override default behaviour.
-(define-method x->pp (obj)
+(define-method x->pp (obj ctx)
   (write-to-string obj))
 
-(define-method x->pp ((xs <list>))
-  (let retry ((smart-indent? #t))
-    (cond
-     ((null? xs) "()")
-     ((and smart-indent?
-           (ref (pp-format-rules) (car xs) #f))
-      => (lambda (proc)
-           (guard (exc
-                   (else
-                    (warn "x->pp: ~S: ~A~%"
-                          (car xs)
-                          (if (&message exc)
-                              (condition-ref exc 'message)
-                              ""))
-                    (retry #f)))
-             (or (proc xs)
-                 (retry #f)))))
-     (else
-      (let loop ((ys (cdr xs))
-                 (rs (list (x->pp (car xs)))))
-        (cond ((null? ys)
-               (let ((zs (pp-sp-breakable (reverse rs))))
-                 (pp-group "(" (pp-nest 1 zs) ")")))
-              ((pair? ys)
-               (loop (cdr ys) (cons (x->pp (car ys)) rs)))
-              (else
-               (loop '() (cons* (x->pp ys) "." rs)))))))))
+(define-method x->pp ((obj <list>) ctx)
+  (define (list->pp xs)
+    (let retry ((smart-indent? #t))
+      (cond
+       ((null? xs) "()")
+       ((and smart-indent?
+             (ref (pp-format-rules) (car xs) #f))
+        => (lambda (proc)
+             (guard (exc
+                     (else
+                      (warn "x->pp: ~S: ~A~%"
+                            (car xs)
+                            (if (&message exc)
+                                (condition-ref exc 'message)
+                                ""))
+                      (retry #f)))
+               (or (proc xs ctx)
+                   (retry #f)))))
+       (else
+        (let loop ((ys (cdr xs))
+                   (rs (list (x->pp (car xs) ctx))))
+          (if (null? ys)
+              (let ((zs (pp-sp-breakable (reverse rs))))
+                (pp-group "(" (pp-nest 1 zs) ")"))
+              (receive (label defining) (pp-label! ys ctx)
+                (cond ((and label defining)
+                       (loop '()
+                             (cons* (list label
+                                          (pp-nest (string-length label)
+                                            (list->pp ys)))
+                                    "." rs)))
+                      (label
+                       (loop '() (cons* label "." rs)))
+                      ((pair? ys)
+                       (loop (cdr ys) (cons (x->pp (car ys) ctx) rs)))
+                      (else
+                       (loop '() (cons* (x->pp ys ctx) "." rs)))))))))))
+  (pp-with-label obj ctx (cut list->pp obj)))
 
-(define-method x->pp ((v <vector>))
-  (pp-group "#("
-            (pp-nest 2 (pp/sep <> (vector->list v)))
-            ")"))
+(define-method x->pp ((v <vector>) ctx)
+  (define (do-pp)
+    (pp-group "#("
+              (pp-nest 2 (pp/sep ctx <> (vector->list v)))
+              ")"))
+  (pp-with-label v ctx do-pp))
+
+(define (pp-label! v ctx)
+  (let* ((ht (pp-context-hash-table ctx))
+         (label (hash-table-get ht v 1)))
+    (cond
+     ((> label 1)
+      (let ((c (pp-context-count ctx)))
+        (hash-table-put! ht v (- c))
+        (inc! (pp-context-count ctx))
+        (values (format "#~D=" c) #t)))
+     ((< label 1)
+      (values (format "#~D#" (- label)) #f))
+     (else (values #f #f)))))
+
+(define (pp-with-label v ctx do-pp)
+  (receive (label defining) (pp-label! v ctx)
+    (cond ((and label defining)
+           (list label
+                 (pp-nest (string-length label)
+                   (do-pp))))
+          (label label)
+          (else (do-pp)))))
+
+(define (pp-mark! obj ctx f)
+  (let ((ht (pp-context-hash-table ctx)))
+    (cond ((hash-table-exists? ht obj)
+           (hash-table-update! ht obj (cut + <> 1)))
+          (else
+           (hash-table-put! ht obj 1)
+           (f)))))
+
+(define-method pp-scan! (obj ctx)
+  #f)
+
+(define-method pp-scan! ((obj <pair>) ctx)
+  (pp-mark! obj ctx
+            (lambda ()
+              (pp-scan! (car obj) ctx)
+              (pp-scan! (cdr obj) ctx))))
+
+(define-method pp-scan! ((obj <vector>) ctx)
+  (pp-mark! obj ctx
+            (lambda ()
+              (vector-for-each (cut pp-scan! <> ctx) obj))))
 
 ;;; A Scheme code formatter.
 ;;; ((pp-scheme-indent n) '(form expr1 expr2 ...))
@@ -207,25 +286,25 @@
    ((not (integer? n))
     (error "an integer required, but got" n))
    ((zero? n)
-    (lambda (xs)
+    (lambda (xs ctx)
       (pp-group "("
                 (pp-nest 2
-                  (pp/sep <> xs))
+                  (pp/sep ctx <> xs))
                 ")")))
    ((= n 1)
     ;; fast-path
-    (lambda (xs)
+    (lambda (xs ctx)
       (let-values  (((h len) (f xs))
-                    ((ps) (pp/sep <> (cdr xs))))
+                    ((ps) (pp/sep ctx <> (cdr xs))))
         (pp-group "(" h " "
                   (pp-nest (+ len 2) (car ps))
                   (make-pp-nest 2 (cdr ps))
                   ")"))))
    ((positive? n)
-    (lambda (xs)
+    (lambda (xs ctx)
       (let*-values (((s len) (f xs))
                     ((ys zs) (split-at* (cdr xs) n))
-                    ((ys) (pp/sep <> ys)))
+                    ((ys) (pp/sep ctx <> ys)))
         (pp-group "(" s " "
                   (pp-group
                    (pp-nest (+ 2 len) (car ys))
@@ -234,26 +313,26 @@
                       '()
                       (pp-nest 2
                         <>
-                        (pp-group (pp/sep <> zs))))
+                        (pp-group (pp/sep ctx <> zs))))
                   ")"))))
    (else
-    (lambda (xs)
+    (lambda (xs ctx)
       (let-values  (((h len) (f xs)))
         (pp-group "(" h " "
                   (pp-nest (+ len 2)
-                    (pp/sep <> (cdr xs)))
+                    (pp/sep ctx <> (cdr xs)))
                   ")"))))))
 
 ;;; Scheme abbreviation formatter.
 ;;; ((pp-scheme-abbrev "<pfx>") '(pfx form))
 ;;; pretty-prints `<pfx>form'.
 (define (pp-scheme-abbrev abbr)
-  (lambda (xs)
+  (lambda (xs ctx)
     (if (and (pair? xs)
              (pair? (cdr xs))
              (null? (cddr xs)))
         (pp-group abbr
-                  (pp-nest (string-length abbr) (x->pp (cadr xs))))
+                  (pp-nest (string-length abbr) (x->pp (cadr xs) ctx)))
         #f)))
 
 ;;;; Core -----------------------------------------------------------
@@ -311,10 +390,10 @@
   (define pp1 (pp-scheme-indent 1))
   (define pp2 (pp-scheme-indent 2))
   (define pp3 (pp-scheme-indent 3))
-  (define (pp-let xs)
+  (define (pp-let xs ctx)
     (if (symbol? (cadr xs))
-        (pp2 xs)
-        (pp1 xs)))
+        (pp2 xs ctx)
+        (pp1 xs ctx)))
   (for-each
    (match-lambda
     ((proc sym)
