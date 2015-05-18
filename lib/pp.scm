@@ -112,7 +112,7 @@
     (let ((port (or port (current-output-port)))
           (width (or width 78))
           (pp (x->pp obj)))
-      (write-tree (pp-make-tree width 0 (list (ctx 0 'flat pp)))
+      (write-tree (pp-make-tree width 0 (list (state 0 'flat pp)))
                   port)
       (newline port)))))
 
@@ -258,7 +258,7 @@
 
 ;;;; Core -----------------------------------------------------------
 
-(define (ctx indent mode doc)
+(define (state indent mode doc)
   (list indent mode doc))
 
 (define (pp-fits? width xs)
@@ -268,9 +268,9 @@
          (((i m ()) ys ...)
           (pp-fits? width ys))
          (((i m ($ <pp-group> (doc ...))) ys ...)
-          (pp-fits? width (xcons ys (ctx i 'flat doc))))
+          (pp-fits? width (xcons ys (state i 'flat doc))))
          (((i m ($ <pp-nest> j (doc ...))) ys ...)
-          (pp-fits? width (xcons ys (ctx (+ i j) m doc))))
+          (pp-fits? width (xcons ys (state (+ i j) m doc))))
          (((i 'break ($ <pp-break> _)) ys ...)
           #t)
          (((i 'flat ($ <pp-break> s)) ys ...)
@@ -278,7 +278,7 @@
          (((i m [? string? s]) ys ...)
           (pp-fits? (- width (string-length s)) ys))
          (((i m (y . ys)) zs ...)
-          (pp-fits? width (cons* (ctx i m y) (ctx i m ys) zs))))))
+          (pp-fits? width (cons* (state i m y) (state i m ys) zs))))))
 
 (define (pp-make-tree width k xs)
   (match xs
@@ -286,12 +286,12 @@
     (((i m ()) ys ...)
      (pp-make-tree width k ys))
     (((i m ($ <pp-group> (doc ...))) ys ...)
-     (let1 mode (if (pp-fits? (- width k) (cons (ctx i 'flat doc) ys))
+     (let1 mode (if (pp-fits? (- width k) (cons (state i 'flat doc) ys))
                     'flat
                     'break)
-       (pp-make-tree width k (xcons ys (ctx i mode doc)))))
+       (pp-make-tree width k (xcons ys (state i mode doc)))))
     (((i m ($ <pp-nest> j (doc ...))) ys ...)
-     (pp-make-tree width k (xcons ys (ctx (+ i j) m doc))))
+     (pp-make-tree width k (xcons ys (state (+ i j) m doc))))
     (((i 'break ($ <pp-break> _)) ys ...)
      (cons* #\newline
             (make-string i #\space)
@@ -301,7 +301,7 @@
     (((i m [? string? s]) ys ...)
      (cons s (pp-make-tree width (+ k (string-length s)) ys)))
     (((i m (y . ys)) zs ...)
-     (pp-make-tree width k (cons* (ctx i m y) (ctx i m ys) zs)))))
+     (pp-make-tree width k (cons* (state i m y) (state i m ys) zs)))))
 
 ;;; R7RS Code Formatters --------------------------------------------
 
