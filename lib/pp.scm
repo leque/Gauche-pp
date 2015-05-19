@@ -230,9 +230,11 @@
                   (pp-group
                    (pp-nest (+ 2 len) (car ys))
                    (pp-nest 4 (cdr ys)))
-                  (pp-nest 2
-                    <>
-                    (pp-group (pp/sep <> zs)))
+                  (if (null? zs)
+                      '()
+                      (pp-nest 2
+                        <>
+                        (pp-group (pp/sep <> zs))))
                   ")"))))
    (else
     (lambda (xs)
