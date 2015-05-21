@@ -313,7 +313,7 @@
      (,pp- if)
      (,pp1 lambda)
      (,pp-let let)
-     (,pp1 let-*)
+     (,pp1 let*)
      (,pp1 let*-values)
      (,pp1 let-syntax)
      (,pp1 let-values)
@@ -322,7 +322,7 @@
      (,pp1 letrec-syntax)
      (,pp- or)
      (,pp0 set!)
-     (,pp0 syntax-rules)
+     (,pp1 syntax-rules)
      (,pp1 unless)
      (,pp1 when)
 
