@@ -26,7 +26,7 @@ LOCAL_PATHS = "@LOCAL_PATHS@"
 PACKAGE   = Gauche-pp
 
 ARCHFILES =
-SCMFILES  = $(srcdir)/lib/pp.scm
+SCMFILES  = $(srcdir)/lib/pp.scm $(srcdir)/lib/pp/core.scm
 HEADERS   =
 
 TARGET    = $(ARCHFILES)

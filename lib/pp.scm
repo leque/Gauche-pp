@@ -30,58 +30,18 @@
 ;;; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;;
 
-;;; Reference: [1] Christian Lindig, "Strictly Pretty", April, 2000
-;;; http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.34.2200
-
 (define-module pp
-  (use srfi-1)
   (use srfi-11)
   (use gauche.parameter)
   (use gauche.record)
   (use util.match)
-  (use text.tree)
+  (use pp.core)
   (export pretty-print
-          pp-group pp-nest pp-break
-          <pp-group> pp-group? pp-group-items
-          <pp-nest> pp-nest? pp-nest-indent pp-nest-items
-          <pp-break> pp-break? pp-break-alternative
-          pp? x->pp
+          x->pp
           pp-format-rules
           pp-scheme-indent pp-scheme-abbrev))
 
 (select-module pp)
-
-;;; Pretty-print types.
-;;; Documents are represend as follows:
-;;;
-;;; <doc> ::= ($ <pp-group> (<doc> ...))
-;;;         | ($ <pp-nest> n (<doc> ...))
-;;;         | ($ <pp-break> s)
-;;;         | (? string?)
-;;;         | (<doc> ...)
-(define (pp? x)
-  (or (pp-group? x)
-      (pp-nest? x)
-      (pp-break? x)
-      (string? x)
-      (pair? x)
-      (null? x)))
-
-(define-record-type <pp-group>
-    make-pp-group
-    pp-group?
-  (items pp-group-items))
-
-(define-record-type <pp-nest>
-    make-pp-nest
-    pp-nest?
-    (indent pp-nest-indent)
-    (items pp-nest-items))
-
-(define-record-type <pp-break>
-    make-pp-break
-    pp-break?
-  (alternative pp-break-alternative))
 
 (define-record-type <pp-context>
     %make-pp-context
@@ -102,22 +62,6 @@
   (hash-table-clear! (pp-context-hash-table ctx))
   (pp-context-count-set! ctx 0))
 
-;;; API: Create a pretty-print group.
-(define (pp-group . args)
-  (make-pp-group args))
-
-;;; API: Create a pretty-print nesting.
-;; (put 'pp-nest 'scheme-indent-function 1)
-(define (pp-nest n . args)
-  (make-pp-nest n args))
-
-;;; API: Create a pretty-print line break.
-(define pp-break
-  (let ((break (make-pp-break " ")))
-    (case-lambda
-     (() break)
-     ((alt) (make-pp-break alt)))))
-
 ;;; API: Pretty-print OBJ to PORT to fit to WIDTH.
 (define pretty-print
   (case-lambda
@@ -133,8 +77,7 @@
           (ctx (make-pp-context)))
       (pp-scan! obj ctx)
       (let ((pp (x->pp obj ctx)))
-        (write-tree (pp-make-tree width 0 (list (state 0 'flat pp)))
-                    port)
+        (pp-write pp width port)
         (newline port)
         (pp-context-clear! ctx))))))
 
@@ -298,7 +241,7 @@
                     ((ps) (pp/sep ctx <> (cdr xs))))
         (pp-group "(" h " "
                   (pp-nest (+ len 2) (car ps))
-                  (make-pp-nest 2 (cdr ps))
+                  (pp-nest 2 (cdr ps))
                   ")"))))
    ((positive? n)
     (lambda (xs ctx)
@@ -334,53 +277,6 @@
         (pp-group abbr
                   (pp-nest (string-length abbr) (x->pp (cadr xs) ctx)))
         #f)))
-
-;;;; Core -----------------------------------------------------------
-
-(define (state indent mode doc)
-  (list indent mode doc))
-
-(define (pp-fits? width xs)
-  (and (not (negative? width))
-       (match xs
-         (() #t)
-         (((i m ()) ys ...)
-          (pp-fits? width ys))
-         (((i m ($ <pp-group> (doc ...))) ys ...)
-          (pp-fits? width (xcons ys (state i 'flat doc))))
-         (((i m ($ <pp-nest> j (doc ...))) ys ...)
-          (pp-fits? width (xcons ys (state (+ i j) m doc))))
-         (((i 'break ($ <pp-break> _)) ys ...)
-          #t)
-         (((i 'flat ($ <pp-break> s)) ys ...)
-          (pp-fits? (- width (string-length s)) ys))
-         (((i m [? string? s]) ys ...)
-          (pp-fits? (- width (string-length s)) ys))
-         (((i m (y . ys)) zs ...)
-          (pp-fits? width (cons* (state i m y) (state i m ys) zs))))))
-
-(define (pp-make-tree width k xs)
-  (match xs
-    (() "")
-    (((i m ()) ys ...)
-     (pp-make-tree width k ys))
-    (((i m ($ <pp-group> (doc ...))) ys ...)
-     (let1 mode (if (pp-fits? (- width k) (cons (state i 'flat doc) ys))
-                    'flat
-                    'break)
-       (pp-make-tree width k (xcons ys (state i mode doc)))))
-    (((i m ($ <pp-nest> j (doc ...))) ys ...)
-     (pp-make-tree width k (xcons ys (state (+ i j) m doc))))
-    (((i 'break ($ <pp-break> _)) ys ...)
-     (cons* #\newline
-            (make-string i #\space)
-            (pp-make-tree width i ys)))
-    (((i 'flat ($ <pp-break> s)) ys ...)
-     (cons s (pp-make-tree width (+ k 1) ys)))
-    (((i m [? string? s]) ys ...)
-     (cons s (pp-make-tree width (+ k (string-length s)) ys)))
-    (((i m (y . ys)) zs ...)
-     (pp-make-tree width k (cons* (state i m y) (state i m ys) zs)))))
 
 ;;; R7RS Code Formatters --------------------------------------------
 

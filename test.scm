@@ -8,6 +8,9 @@
 (use pp)
 (test-module 'pp)
 
+(use pp.core)
+(test-module 'pp.core)
+
 (define-syntax test-pp
   (syntax-rules ()
     ((_ width expr str)
