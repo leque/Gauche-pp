@@ -77,8 +77,8 @@
 (define-record-type <pp-nest>
     make-pp-nest
     pp-nest?
-    (indent pp-nest-indent)
-    (items pp-nest-items))
+  (indent pp-nest-indent)
+  (items pp-nest-items))
 
 (define-record-type <pp-break>
     make-pp-break
