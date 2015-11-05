@@ -39,7 +39,7 @@
   (use util.match)
   (use text.tree)
   (export pp-write
-          pp-group pp-nest pp-break
+          pp-group pp-nest pp-break pp-newline
           pp-string pp-zero-width-string
           <pp-group> pp-group? pp-group-items
           <pp-nest> pp-nest? pp-nest-indent pp-nest-items
@@ -59,6 +59,7 @@
 ;;;
 ;;; <doc> ::= ($ <pp-group> (<doc> ...))
 ;;;         | ($ <pp-nest> n (<doc> ...))
+;;;         | ($ <pp-newline> s)
 ;;;         | ($ <pp-break> s)
 ;;;         | ($ <pp-string> s w)
 ;;;         | (? string?)
@@ -84,6 +85,10 @@
   (indent pp-nest-indent)
   (items pp-nest-items))
 
+(define-record-type <pp-newline>
+    make-pp-newline
+    pp-newline?)
+
 (define-record-type <pp-break>
     make-pp-break
     pp-break?
@@ -103,6 +108,10 @@
 ;; (put 'pp-nest 'scheme-indent-function 1)
 (define (pp-nest n . args)
   (make-pp-nest n args))
+
+(define pp-newline
+  (let ((v (make-pp-newline)))
+    (lambda () v)))
 
 ;;; API: Create a pretty-print line break.
 (define pp-break
@@ -139,6 +148,8 @@
           (pp-fits? width (xcons ys (state i 'flat doc))))
          (((i m ($ <pp-nest> j (doc ...))) ys ...)
           (pp-fits? width (xcons ys (state (+ i j) m doc))))
+         (((i _ ($ <pp-newline>)) ys ...)
+          #t)
          (((i 'break ($ <pp-break> _)) ys ...)
           #t)
          (((i 'flat ($ <pp-break> s)) ys ...)
@@ -151,26 +162,33 @@
           (pp-fits? width (cons* (state i m y) (state i m ys) zs))))))
 
 (define (pp-make-tree width k xs)
-  (match xs
-    (() "")
-    (((i m ()) ys ...)
-     (pp-make-tree width k ys))
-    (((i m ($ <pp-group> (doc ...))) ys ...)
-     (let1 mode (if (pp-fits? (- width k) (cons (state i 'flat doc) ys))
-                    'flat
-                    'break)
-       (pp-make-tree width k (xcons ys (state i mode doc)))))
-    (((i m ($ <pp-nest> j (doc ...))) ys ...)
-     (pp-make-tree width k (xcons ys (state (+ i j) m doc))))
-    (((i 'break ($ <pp-break> _)) ys ...)
-     (cons* #\newline
-            (make-string i #\space)
-            (pp-make-tree width i ys)))
-    (((i 'flat ($ <pp-break> s)) ys ...)
-     (cons s (pp-make-tree width (+ k (string-width s)) ys)))
-    (((i m (or ($ <pp-string> s w)
-               (and (? string? s) (= string-width w))))
-      ys ...)
-     (cons s (pp-make-tree width (+ k w) ys)))
-    (((i m (y . ys)) zs ...)
-     (pp-make-tree width k (cons* (state i m y) (state i m ys) zs)))))
+  (let loop ((width width)
+             (k k)
+             (indent #f)
+             (xs xs))
+    (match xs
+      (() '())
+      (((i m ()) ys ...)
+       (loop width k indent ys))
+      (((i m ($ <pp-group> (doc ...))) ys ...)
+       (let1 mode (if (pp-fits? (- width k) (cons (state i 'flat doc) ys))
+                      'flat
+                      'break)
+         (loop width k indent (xcons ys (state i mode doc)))))
+      (((i m ($ <pp-nest> j (doc ...))) ys ...)
+       (loop width k indent (xcons ys (state (+ i j) m doc))))
+      (((or (i _ ($ <pp-newline>))
+            (i 'break ($ <pp-break> _)))
+        ys ...)
+       (cons #\newline
+             (loop width i (make-string i #\space) ys)))
+      (((i 'flat ($ <pp-break> s)) ys ...)
+       (cons s (loop width (+ k (string-width s)) indent ys)))
+      (((i m (or ($ <pp-string> s w)
+                 (and (? string? s) (= string-width w))))
+        ys ...)
+       (cond-list
+        (indent indent)
+        (#t (cons s (loop width (+ k w) "" ys)))))
+      (((i m (y . ys)) zs ...)
+       (loop width k indent (cons* (state i m y) (state i m ys) zs))))))

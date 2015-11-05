@@ -75,6 +75,45 @@
  "\
 <number>1</number> <number>2</number>")
 
+(test-pp-core
+ 70
+ (pp-group "1" (pp-break) "2")
+ "1 2")
+
+(test-pp-core
+ 70
+ (pp-group "1" (pp-newline) "2")
+ "\
+1
+2")
+
+(test-pp-core
+ 70
+ (pp-group "1" (pp-newline) (pp-newline) "2")
+ "\
+1
+
+2")
+
+(test-pp-core
+ 70
+ (pp-group "<"
+           (pp-nest 1 "1" (pp-newline) "2")
+           ">")
+ "\
+<1
+ 2>")
+
+(test-pp-core
+ 70
+ (pp-group "<"
+           (pp-nest 1 "1" (pp-newline) (pp-newline) "2")
+           ">")
+ "\
+<1
+
+ 2>")
+
 ;;-------+---------+---------+---------+---------|---------+---------+---------+
 
 (test-section "pretty-print lists")
