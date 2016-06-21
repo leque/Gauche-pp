@@ -104,6 +104,8 @@
 (define (state indent mode doc)
   (list indent mode doc))
 
+(define string-width string-length)
+
 (define (pp-fits? width xs)
   (and (not (negative? width))
        (match xs
@@ -117,9 +119,9 @@
          (((i 'break ($ <pp-break> _)) ys ...)
           #t)
          (((i 'flat ($ <pp-break> s)) ys ...)
-          (pp-fits? (- width (string-length s)) ys))
+          (pp-fits? (- width (string-width s)) ys))
          (((i m (? string? s)) ys ...)
-          (pp-fits? (- width (string-length s)) ys))
+          (pp-fits? (- width (string-width s)) ys))
          (((i m (y . ys)) zs ...)
           (pp-fits? width (cons* (state i m y) (state i m ys) zs))))))
 
@@ -142,6 +144,6 @@
     (((i 'flat ($ <pp-break> s)) ys ...)
      (cons s (pp-make-tree width (+ k 1) ys)))
     (((i m (? string? s)) ys ...)
-     (cons s (pp-make-tree width (+ k (string-length s)) ys)))
+     (cons s (pp-make-tree width (+ k (string-width s)) ys)))
     (((i m (y . ys)) zs ...)
      (pp-make-tree width k (cons* (state i m y) (state i m ys) zs)))))
