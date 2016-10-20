@@ -302,6 +302,7 @@
 
      (,pp- and)
      (,pp0 begin)
+     (,pp1 case)
      (,pp0 cond)
      (,pp0 cond-expand)
      (,pp1 define)
