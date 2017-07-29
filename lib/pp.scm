@@ -96,7 +96,7 @@
   (intersperse <> xs))
 
 (define (pp/sep ctx sep xs)
-  (intersperse <> (map (cut x->pp <> ctx) xs)))
+  (intersperse sep (map (cut x->pp <> ctx) xs)))
 
 ;;; API: convert an object to a pretty-print document.
 ;;; You can override default behaviour.
