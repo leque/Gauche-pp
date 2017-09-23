@@ -32,14 +32,15 @@
 
 (define-module pp
   (use srfi-11)
+  (use gauche.dictionary)
   (use gauche.parameter)
-  (use gauche.record)
   (use util.match)
   (use pp.core)
   (export pretty-print
           x->pp
           pp-format-rules
-          pp-scheme-indent pp-scheme-abbrev))
+          pp-scheme-indent pp-scheme-abbrev
+          pp-r7rs-format-rules pp-sxml-format-rules))
 
 (select-module pp)
 
@@ -90,13 +91,13 @@
       (pp-context-clear! ctx))))
 
 ;;; API: Format rules for a specific list structure.
-;;; A hashtable whose keys are symbols of a car of a list and
+;;; A <dictionary> whose keys are symbols of a car of a list and
 ;;; values are format procedures.
 ;;; An format procedure could return a pretty-print document or #f.
 ;;; #f means `cannot format this list. use default strategy'.
 ;;; If an format function raises exception,
 ;;; simply ignore it and use default strategy.
-(define pp-format-rules (make-parameter (make-hash-table 'eq?)))
+(define pp-format-rules (make-parameter #f))
 
 (define <> (pp-break))
 
@@ -117,7 +118,7 @@
       (cond
        ((null? xs) "()")
        ((and smart-indent?
-             (ref (pp-format-rules) (car xs) #f))
+             (dict-get (pp-format-rules) (car xs) #f))
         => (lambda (proc)
              (guard (exc
                      (else
@@ -289,63 +290,84 @@
                   (pp-nest (string-length abbr) (x->pp (cadr xs) ctx)))
         #f)))
 
-;;; R7RS Code Formatters --------------------------------------------
+;; R7RS Code Formatters
+(define pp-r7rs-format-rules
+  (rlet1 rules (make-hash-table 'eq?)
+    (define pp- (pp-scheme-indent -1))
+    (define pp0 (pp-scheme-indent 0))
+    (define pp1 (pp-scheme-indent 1))
+    (define pp2 (pp-scheme-indent 2))
+    (define pp3 (pp-scheme-indent 3))
+    (define (pp-let xs ctx)
+      (if (symbol? (cadr xs))
+          (pp2 xs ctx)
+          (pp1 xs ctx)))
+    (for-each
+     (match-lambda
+      ((proc sym)
+       (set! (ref rules sym) proc)))
+     `(
+       (,(pp-scheme-abbrev "'") quote)
+       (,(pp-scheme-abbrev "`") quasiquote)
+       (,(pp-scheme-abbrev ",") ,'unquote)
+       (,(pp-scheme-abbrev ",@") ,'unquote-splicing)
 
-(define (pp-install-rules)
-  (define pp- (pp-scheme-indent -1))
-  (define pp0 (pp-scheme-indent 0))
-  (define pp1 (pp-scheme-indent 1))
-  (define pp2 (pp-scheme-indent 2))
-  (define pp3 (pp-scheme-indent 3))
-  (define (pp-let xs ctx)
-    (if (symbol? (cadr xs))
-        (pp2 xs ctx)
-        (pp1 xs ctx)))
-  (for-each
-   (match-lambda
-    ((proc sym)
-     (set! (ref (pp-format-rules) sym) proc)))
-   `(
-     (,(pp-scheme-abbrev "'") quote)
-     (,(pp-scheme-abbrev "`") quasiquote)
-     (,(pp-scheme-abbrev ",") ,'unquote)
-     (,(pp-scheme-abbrev ",@") ,'unquote-splicing)
+       (,pp- and)
+       (,pp0 begin)
+       (,pp1 case)
+       (,pp0 cond)
+       (,pp0 cond-expand)
+       (,pp1 define)
+       (,pp3 define-record-type)
+       (,pp1 define-syntax)
+       (,pp1 define-values)
+       (,pp2 do)
+       (,pp1 guard)
+       (,pp- if)
+       (,pp1 lambda)
+       (,pp-let let)
+       (,pp1 let*)
+       (,pp1 let*-values)
+       (,pp1 let-syntax)
+       (,pp1 let-values)
+       (,pp1 letrec)
+       (,pp1 letrec*)
+       (,pp1 letrec-syntax)
+       (,pp- or)
+       (,pp0 set!)
+       (,pp1 syntax-rules)
+       (,pp1 unless)
+       (,pp1 when)
 
-     (,pp- and)
-     (,pp0 begin)
-     (,pp1 case)
-     (,pp0 cond)
-     (,pp0 cond-expand)
-     (,pp1 define)
-     (,pp3 define-record-type)
-     (,pp1 define-syntax)
-     (,pp1 define-values)
-     (,pp2 do)
-     (,pp1 guard)
-     (,pp- if)
-     (,pp1 lambda)
-     (,pp-let let)
-     (,pp1 let*)
-     (,pp1 let*-values)
-     (,pp1 let-syntax)
-     (,pp1 let-values)
-     (,pp1 letrec)
-     (,pp1 letrec*)
-     (,pp1 letrec-syntax)
-     (,pp- or)
-     (,pp0 set!)
-     (,pp1 syntax-rules)
-     (,pp1 unless)
-     (,pp1 when)
+       (,pp1 call-with-port)
+       (,pp1 call-with-values)
+       (,pp1 with-exception-handler)
 
-     (,pp1 call-with-port)
-     (,pp1 call-with-values)
-     (,pp1 with-exception-handler)
+       (,pp1 call-with-input-file)
+       (,pp1 call-with-output-file)
+       (,pp1 with-input-from-file)
+       (,pp1 with-output-from-file)
+       ))))
 
-     (,pp1 call-with-input-file)
-     (,pp1 call-with-output-file)
-     (,pp1 with-input-from-file)
-     (,pp1 with-output-from-file)
-     )))
+(pp-format-rules pp-r7rs-format-rules)
 
-(pp-install-rules)
+(define-class <const-dictionary> (<dictionary>)
+  ((value :init-keyword :value)))
+
+(define-method dict-get ((d <const-dictionary>) key :optional default)
+  (~ d 'value))
+
+(define pp-sxml-format-rules
+  (let ()
+    (define pp0 (pp-scheme-indent 0))
+    (define pp1 (pp-scheme-indent 1))
+    (define pp2 (pp-scheme-indent 2))
+    (make <const-dictionary>
+      :value (lambda (xs ctx)
+               (match xs
+                 ((_ ('@ . _) ('@@ . _) . _)
+                  (pp2 xs ctx))
+                 ((_ ((or '@ '@@) . _) . _)
+                  (pp1 xs ctx))
+                 (_
+                  #f))))))
