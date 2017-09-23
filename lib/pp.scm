@@ -1,5 +1,5 @@
 ;;;
-;;; Copyright (c) 2008, 2015 OOHASHI, Daichi <dico.leque.comicron@gmail.com>,
+;;; Copyright (c) 2008, 2015-2017 OOHASHI Daichi <dico.leque.comicron@gmail.com>,
 ;;; All rights reserved.
 ;;;
 ;;; Redistribution and use in source and binary forms, with or without
@@ -48,31 +48,23 @@
   (
    ;; the current datum label count
    (count
-    :accessor pp-context-count
-    :setter pp-context-count-set!
-    :init-keyword :count)
+    :init-value 0)
    ;; obj * int mappings.
    ;; If a value n > 0, it means number of times an obj was seen in scan path.
    ;; If n <= 0, -n means a datum label for an obj in print path.
    (hash-table
-    :getter pp-context-hash-table
-    :init-keyword :hash-table)
+    :init-form (make-hash-table 'eq?))
+   ;; If true, write shared structures as in write-shared.
+   ;; Otherwise, write circular structures only as in write.
    (print-shared?
     :init-keyword :print-shared)
    ))
 
-(define (make-pp-context :key print-shared)
-  (make <pp-context>
-    :print-shared print-shared
-    :count 0
-    :hash-table (make-hash-table 'eq?)
-    ))
-
 (define (pp-context-clear! ctx)
   ;; clear the hash-table for GC friendliness.
   ;; See also cleanup_port_context in Gauche/src/write.c
-  (hash-table-clear! (pp-context-hash-table ctx))
-  (pp-context-count-set! ctx 0))
+  (hash-table-clear! (~ ctx 'hash-table))
+  (set! (~ ctx 'count) 0))
 
 ;;; API: Pretty-print OBJ to PORT to fit to WIDTH.
 (define (pretty-print obj
@@ -81,9 +73,9 @@
                       (print-shared #f)
                       (width 78)
                       )
-  (let ((ctx (make-pp-context
-              :print-shared print-shared
-              )))
+  (let ((ctx (make <pp-context>
+               :print-shared print-shared
+               )))
     (pp-scan! obj ctx)
     (let ((pp (x->pp obj ctx)))
       (pp-write pp width port)
@@ -159,13 +151,13 @@
   (pp-with-label v ctx do-pp))
 
 (define (pp-label! v ctx)
-  (let* ((ht (pp-context-hash-table ctx))
+  (let* ((ht (~ ctx 'hash-table))
          (label (hash-table-get ht v 1)))
     (cond
      ((> label 1)
-      (let ((c (pp-context-count ctx)))
+      (let ((c (~ ctx 'count)))
         (hash-table-put! ht v (- c))
-        (inc! (pp-context-count ctx))
+        (inc! (~ ctx 'count))
         (values (format "#~D=" c) #t)))
      ((< label 1)
       (values (format "#~D#" (- label)) #f))
@@ -181,7 +173,7 @@
           (else (do-pp)))))
 
 (define (pp-mark! obj ctx f)
-  (let ((ht (pp-context-hash-table ctx)))
+  (let ((ht (~ ctx 'hash-table)))
     (cond ((hash-table-exists? ht obj)
            (hash-table-update! ht obj (cut + <> 1)))
           (else
@@ -305,7 +297,7 @@
     (for-each
      (match-lambda
       ((proc sym)
-       (set! (ref rules sym) proc)))
+       (set! (~ rules sym) proc)))
      `(
        (,(pp-scheme-abbrev "'") quote)
        (,(pp-scheme-abbrev "`") quasiquote)
