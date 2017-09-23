@@ -43,18 +43,29 @@
 
 (select-module pp)
 
-(define-record-type <pp-context>
-    %make-pp-context
-    pp-context?
-  ;; the current datum label count
-  (count pp-context-count pp-context-count-set!)
-  ;; obj * int mappings.
-  ;; If a value n > 0, it means number of times an obj was seen in scan path.
-  ;; If n <= 0, -n means a datum label for an obj in print path.
-  (hash-table pp-context-hash-table))
+(define-class <pp-context> ()
+  (
+   ;; the current datum label count
+   (count
+    :accessor pp-context-count
+    :setter pp-context-count-set!
+    :init-keyword :count)
+   ;; obj * int mappings.
+   ;; If a value n > 0, it means number of times an obj was seen in scan path.
+   ;; If n <= 0, -n means a datum label for an obj in print path.
+   (hash-table
+    :getter pp-context-hash-table
+    :init-keyword :hash-table)
+   (print-shared?
+    :init-keyword :print-shared)
+   ))
 
-(define (make-pp-context)
-  (%make-pp-context 0 (make-hash-table)))
+(define (make-pp-context :key print-shared)
+  (make <pp-context>
+    :print-shared print-shared
+    :count 0
+    :hash-table (make-hash-table 'eq?)
+    ))
 
 (define (pp-context-clear! ctx)
   ;; clear the hash-table for GC friendliness.
@@ -63,23 +74,19 @@
   (pp-context-count-set! ctx 0))
 
 ;;; API: Pretty-print OBJ to PORT to fit to WIDTH.
-(define pretty-print
-  (case-lambda
-   ((obj)
-    (pretty-print obj #f #f))
-   ((obj port-or-width)
-    (if (port? port-or-width)
-        (pretty-print obj port-or-width #f)
-        (pretty-print obj #f port-or-width)))
-   ((obj port width)
-    (let ((port (or port (current-output-port)))
-          (width (or width 78))
-          (ctx (make-pp-context)))
-      (pp-scan! obj ctx)
-      (let ((pp (x->pp obj ctx)))
-        (pp-write pp width port)
-        (newline port)
-        (pp-context-clear! ctx))))))
+(define (pretty-print obj
+                      :key
+                      (port (current-output-port))
+                      (width 78)
+                      )
+  (let ((ctx (make-pp-context
+              :print-shared #f
+              )))
+    (pp-scan! obj ctx)
+    (let ((pp (x->pp obj ctx)))
+      (pp-write pp width port)
+      (newline port)
+      (pp-context-clear! ctx))))
 
 ;;; API: Format rules for a specific list structure.
 ;;; A hashtable whose keys are symbols of a car of a list and

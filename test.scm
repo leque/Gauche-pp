@@ -22,7 +22,7 @@
             str
             (with-output-to-string
               (lambda ()
-                (pretty-print 'expr width)))))))
+                (pretty-print 'expr :width width)))))))
 
 (test-section "pretty-print lists")
 
