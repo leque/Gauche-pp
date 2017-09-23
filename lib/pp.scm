@@ -77,10 +77,11 @@
 (define (pretty-print obj
                       :key
                       (port (current-output-port))
+                      (print-shared #f)
                       (width 78)
                       )
   (let ((ctx (make-pp-context
-              :print-shared #f
+              :print-shared print-shared
               )))
     (pp-scan! obj ctx)
     (let ((pp (x->pp obj ctx)))
@@ -184,7 +185,10 @@
            (hash-table-update! ht obj (cut + <> 1)))
           (else
            (hash-table-put! ht obj 1)
-           (f)))))
+           (f)))
+    (when (and (not (~ ctx 'print-shared?))
+               (eqv? (hash-table-get ht obj #f) 1))
+      (hash-table-delete! ht obj))))
 
 (define-method pp-scan! (obj ctx)
   #f)

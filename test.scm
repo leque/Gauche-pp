@@ -13,22 +13,22 @@
 
 (define-syntax test-pp
   (syntax-rules ()
-    ((_ width expr str)
-     (test* (format "width=~A: ~A"
-                    width
+    ((_ (opt ...) expr str)
+     (test* (format "keys=~S: ~A"
+                    '(opt ...)
                     (with-output-to-string
                       (lambda ()
                         (write/ss 'expr))))
             str
             (with-output-to-string
               (lambda ()
-                (pretty-print 'expr :width width)))))))
+                (pretty-print 'expr opt ...)))))))
 
 (test-section "pretty-print lists")
 
-(test-pp 70 (1 2 3 4 5 6 7) "(1 2 3 4 5 6 7)\n")
+(test-pp (:width 70) (1 2 3 4 5 6 7) "(1 2 3 4 5 6 7)\n")
 
-(test-pp 8 (1 2 3 4 5 6 7) "\
+(test-pp (:width 8) (1 2 3 4 5 6 7) "\
 (1
  2
  3
@@ -42,9 +42,9 @@
 
 (test-section "pretty-print vectors")
 
-(test-pp 70 #(1 2 3 4 5 6 7) "#(1 2 3 4 5 6 7)\n")
+(test-pp (:width 70) #(1 2 3 4 5 6 7) "#(1 2 3 4 5 6 7)\n")
 
-(test-pp 8 #(1 2 3 4 5 6 7) "\
+(test-pp (:width 8) #(1 2 3 4 5 6 7) "\
 #(1
   2
   3
@@ -54,7 +54,7 @@
   7)
 ")
 
-(test-pp 10 #((1 2) (3 4) (5 6) (7 8)) "\
+(test-pp (:width 10) #((1 2) (3 4) (5 6) (7 8)) "\
 #((1 2)
   (3 4)
   (5 6)
@@ -65,11 +65,11 @@
 
 (test-section "pretty-print programs")
 
-(test-pp 40
+(test-pp (:width 40)
          '#(1 ,(2 3) ,@(4 5 6) (7 '(8 9)))
          "'#(1 ,(2 3) ,@(4 5 6) (7 '(8 9)))\n")
 
-(test-pp 30
+(test-pp (:width 30)
          '#(1 ,(2 3) ,@(4 5 6) (7 '(8 9)))
          "\
 '#(1
@@ -78,7 +78,7 @@
    (7 '(8 9)))
 ")
 
-(test-pp 10
+(test-pp (:width 10)
          '#(1 ,(2 3) ,@(4 5 6) (7 '(8 9)))
          "\
 '#(1
@@ -91,7 +91,7 @@
       9)))
 ")
 
-(test-pp 5
+(test-pp (:width 5)
          '#(1 ,(2 3) ,@(4 5 6) (7 '(8 9)))
          "\
 '#(1
@@ -105,22 +105,22 @@
       9)))
 ")
 
-(test-pp 30 (let ((a 1) (b 2)) (+ a b)) "(let ((a 1) (b 2)) (+ a b))\n")
+(test-pp (:width 30) (let ((a 1) (b 2)) (+ a b)) "(let ((a 1) (b 2)) (+ a b))\n")
 
-(test-pp 20
+(test-pp (:width 20)
          (let ((a 1) (b 2)) (+ a b)) "\
 (let ((a 1) (b 2))
   (+ a b))
 ")
 
-(test-pp 15
+(test-pp (:width 15)
          (let ((a 1) (b 2)) (+ a b)) "\
 (let ((a 1)
       (b 2))
   (+ a b))
 ")
 
-(test-pp 10
+(test-pp (:width 10)
          (let ((a 1) (b 2)) (+ a b)) "\
 (let ((a
        1)
@@ -129,18 +129,18 @@
   (+ a b))
 ")
 
-(test-pp 70
+(test-pp (:width 70)
          (let fib ((n 10) (a 0) (b 1)) (if (= n 0) a (fib (- n 1) b (+ a b))))
          "(let fib ((n 10) (a 0) (b 1)) (if (= n 0) a (fib (- n 1) b (+ a b))))\n")
 
-(test-pp 50
+(test-pp (:width 50)
          (let fib ((n 10) (a 0) (b 1)) (if (= n 0) a (fib (- n 1) b (+ a b))))
          "\
 (let fib ((n 10) (a 0) (b 1))
   (if (= n 0) a (fib (- n 1) b (+ a b))))
 ")
 
-(test-pp 30
+(test-pp (:width 30)
          (let fib ((n 10) (a 0) (b 1)) (if (= n 0) a (fib (- n 1) b (+ a b))))
          "\
 (let fib ((n 10) (a 0) (b 1))
@@ -152,7 +152,7 @@
        (+ a b))))
 ")
 
-(test-pp 25
+(test-pp (:width 25)
          (let fib ((n 10) (a 0) (b 1)) (if (= n 0) a (fib (- n 1) b (+ a b))))
          "\
 (let fib
@@ -165,7 +165,7 @@
        (+ a b))))
 ")
 
-(test-pp 20
+(test-pp (:width 20)
          (let fib ((n 10) (a 0) (b 1)) (if (= n 0) a (fib (- n 1) b (+ a b))))
          "\
 (let fib
@@ -180,11 +180,11 @@
        (+ a b))))
 ")
 
-(test-pp 60
+(test-pp (:width 60)
          (do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b))) ((= n 0) a) #f)
          "(do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b))) ((= n 0) a) #f)\n")
 
-(test-pp 50
+(test-pp (:width 50)
          (do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b))) ((= n 0) a) #f)
          "\
 (do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b)))
@@ -192,7 +192,7 @@
   #f)
 ")
 
-(test-pp 15
+(test-pp (:width 15)
          (do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b))) ((= n 0) a) #f)
          "\
 (do ((n
@@ -206,18 +206,18 @@
   #f)
 ")
 
-(test-pp 60
+(test-pp (:width 60)
          (do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b))) ((= n 0) a))
          "(do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b))) ((= n 0) a))\n")
 
-(test-pp 50
+(test-pp (:width 50)
          (do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b))) ((= n 0) a))
          "\
 (do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b)))
     ((= n 0) a))
 ")
 
-(test-pp 15
+(test-pp (:width 15)
          (do ((n 10 (- n 1)) (a 0 b) (b 1 (+ a b))) ((= n 0) a))
          "\
 (do ((n
@@ -231,9 +231,9 @@
      a))
 ")
 
-(test-pp 30 (and 1 2 3) "(and 1 2 3)\n")
+(test-pp (:width 30) (and 1 2 3) "(and 1 2 3)\n")
 
-(test-pp 5 (and 1 2 3) "\
+(test-pp (:width 5) (and 1 2 3) "\
 (and 1
      2
      3)
@@ -243,16 +243,25 @@
 
 (test-section "pretty-print shared structures")
 
-(test-pp 20 #(#0=(1) #0#) "#(#0=(1) #0#)\n")
-(test-pp 10 #(#0=(1) #0#) "\
+(test-pp (:width 20)
+         #((1) (1))
+         "#((1) (1))\n")
+(test-pp (:width 20 :print-shared #t)
+         #(#0=(1) #0#)
+         "#(#0=(1) #0#)\n")
+(test-pp (:width 5) #(#0=(1) #0#) "\
+#((1)
+  (1))
+")
+(test-pp (:width 5 :print-shared #t) #(#0=(1) #0#) "\
 #(#0=(1)
   #0#)
 ")
 
-(test-pp 20 #0=(#0#) "#0=(#0#)\n")
+(test-pp (:width 20) #0=(#0#) "#0=(#0#)\n")
 
-(test-pp 30 #0=(#0# #0# #0# #0# #0#) "#0=(#0# #0# #0# #0# #0#)\n")
-(test-pp 10 #0=(#0# #0# #0# #0# #0#) "\
+(test-pp (:width 30) #0=(#0# #0# #0# #0# #0#) "#0=(#0# #0# #0# #0# #0#)\n")
+(test-pp (:width 10) #0=(#0# #0# #0# #0# #0#) "\
 #0=(#0#
     #0#
     #0#
@@ -260,11 +269,11 @@
     #0#)
 ")
 
-(test-pp 30 #0=(1 . #0#) "#0=(1 . #0#)\n")
+(test-pp (:width 30) #0=(1 . #0#) "#0=(1 . #0#)\n")
 
-(test-pp 30 (1 . #0=(2 . #0#)) "(1 . #0=(2 . #0#))\n")
+(test-pp (:width 30) (1 . #0=(2 . #0#)) "(1 . #0=(2 . #0#))\n")
 
-(test-pp 10 (1 . #0=(2 . #0#)) "\
+(test-pp (:width 10) (1 . #0=(2 . #0#)) "\
 (1
  .
  #0=(2
@@ -272,13 +281,13 @@
      #0#))
 ")
 
-(test-pp +inf.0 #0='#0# "#0='#0#\n")
+(test-pp (:width +inf.0) #0='#0# "#0='#0#\n")
 
-(test-pp +inf.0
+(test-pp (:width +inf.0 :print-shared #t)
          #0=(((#1=(#0# #0# z) #1# y) . #2=(#1# #0# . x)) #2#)
          "#0=(((#1=(#0# #0# z) #1# y) . #2=(#1# #0# . x)) #2#)\n")
 
-(test-pp +inf.0
+(test-pp (:width +inf.0 :print-shared #t)
          (#0=(a) #1=(b) #2=(c) #3=(d) #4=(e) #5=(f) #6=(g) #7=(h) #8=(i) #9=(j) #10=(k) #10# #9# #8# #7# #6# #5# #4# #3# #2# #1# #0#)
          "(#0=(a) #1=(b) #2=(c) #3=(d) #4=(e) #5=(f) #6=(g) #7=(h) #8=(i) #9=(j) #10=(k) #10# #9# #8# #7# #6# #5# #4# #3# #2# #1# #0#)\n")
 
