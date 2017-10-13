@@ -24,6 +24,59 @@
               (lambda ()
                 (pretty-print 'expr opt ...)))))))
 
+(define-syntax test-pp-core
+  (syntax-rules ()
+    ((_ width expr str)
+     (test* (format "width=~A: ~A"
+                    width
+                    (with-output-to-string
+                      (lambda ()
+                        (write/ss 'expr))))
+            str
+            (call-with-output-string
+              (cut pp-write expr width <>))))))
+
+(test-section "pretty-print core")
+
+(test-pp-core
+ 70
+ (pp-group
+  (pp-string "<number>") "1" (pp-string "</number>")
+  (pp-break)
+  (pp-string "<number>") "2" (pp-string "</number>"))
+ "\
+<number>1</number> <number>2</number>")
+
+(test-pp-core
+ 70
+ (pp-group
+  (pp-zero-width-string "<number>") "1" (pp-zero-width-string "</number>")
+  (pp-break)
+  (pp-zero-width-string "<number>") "2" (pp-zero-width-string "</number>"))
+ "\
+<number>1</number> <number>2</number>")
+
+(test-pp-core
+ 20
+ (pp-group
+  (pp-string "<number>") "1" (pp-string "</number>")
+  (pp-break)
+  (pp-string "<number>") "2" (pp-string "</number>"))
+ "\
+<number>1</number>
+<number>2</number>")
+
+(test-pp-core
+ 20
+ (pp-group
+  (pp-zero-width-string "<number>") "1" (pp-zero-width-string "</number>")
+  (pp-break)
+  (pp-zero-width-string "<number>") "2" (pp-zero-width-string "</number>"))
+ "\
+<number>1</number> <number>2</number>")
+
+;;-------+---------+---------+---------+---------|---------+---------+---------+
+
 (test-section "pretty-print lists")
 
 (test-pp (:width 70) (1 2 3 4 5 6 7) "(1 2 3 4 5 6 7)\n")

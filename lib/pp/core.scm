@@ -40,9 +40,11 @@
   (use text.tree)
   (export pp-write
           pp-group pp-nest pp-break
+          pp-string pp-zero-width-string
           <pp-group> pp-group? pp-group-items
           <pp-nest> pp-nest? pp-nest-indent pp-nest-items
           <pp-break> pp-break? pp-break-alternative
+          <pp-string> pp-string? pp-string-content pp-string-width
           ))
 
 (select-module pp.core)
@@ -58,6 +60,7 @@
 ;;; <doc> ::= ($ <pp-group> (<doc> ...))
 ;;;         | ($ <pp-nest> n (<doc> ...))
 ;;;         | ($ <pp-break> s)
+;;;         | ($ <pp-string> s w)
 ;;;         | (? string?)
 ;;;         | (<doc> . <doc>)
 ;;;         | ()
@@ -65,6 +68,7 @@
   (or (pp-group? x)
       (pp-nest? x)
       (pp-break? x)
+      (pp-string? x)
       (string? x)
       (pair? x)
       (null? x)))
@@ -85,6 +89,12 @@
     pp-break?
   (alternative pp-break-alternative))
 
+(define-record-type <pp-string>
+    %make-pp-string
+    pp-string?
+  (content pp-string-content)
+  (width pp-string-width))
+
 ;;; API: Create a pretty-print group.
 (define (pp-group . args)
   (make-pp-group args))
@@ -100,6 +110,19 @@
     (case-lambda
      (() break)
      ((alt) (make-pp-break alt)))))
+
+;;; API: string with an explicit width
+(define pp-string
+  (case-lambda
+    ((s) (pp-string s (string-width s)))
+    ((s width)
+     (unless (string? s)
+       (error "string required, but got" s))
+     (%make-pp-string s width))))
+
+;;; API: equivalent to (pp-string s 0)
+(define (pp-zero-width-string s)
+  (pp-string s 0))
 
 (define (state indent mode doc)
   (list indent mode doc))
@@ -120,6 +143,8 @@
           #t)
          (((i 'flat ($ <pp-break> s)) ys ...)
           (pp-fits? (- width (string-width s)) ys))
+         (((i m ($ <pp-string> _ w)) ys ...)
+          (pp-fits? (- width w) ys))
          (((i m (? string? s)) ys ...)
           (pp-fits? (- width (string-width s)) ys))
          (((i m (y . ys)) zs ...)
@@ -143,6 +168,8 @@
             (pp-make-tree width i ys)))
     (((i 'flat ($ <pp-break> s)) ys ...)
      (cons s (pp-make-tree width (+ k 1) ys)))
+    (((i m ($ <pp-string> s w)) ys ...)
+     (cons s (pp-make-tree width (+ k w) ys)))
     (((i m (? string? s)) ys ...)
      (cons s (pp-make-tree width (+ k (string-width s)) ys)))
     (((i m (y . ys)) zs ...)
