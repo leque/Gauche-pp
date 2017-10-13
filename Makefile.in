@@ -49,6 +49,7 @@ pp.$(SOEXT): $(pp_SRCS)
 check : all
 	@rm -f test.log
 	$(GOSH) -I. -I$(srcdir)/lib $(srcdir)/test.scm > test.log
+	$(GOSH) -I. -I$(srcdir)/lib $(srcdir)/examples/pp-file.scm $(srcdir)/examples/pp-file.scm >/dev/null
 
 install : all
 	$(INSTALL) -m 444 -T $(GAUCHE_PKGINCDIR) $(HEADERS)
