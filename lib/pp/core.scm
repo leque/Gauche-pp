@@ -1,5 +1,5 @@
 ;;;
-;;; Copyright (c) 2008, 2015 OOHASHI, Daichi <dico.leque.comicron@gmail.com>,
+;;; Copyright (c) 2008, 2015-2017 OOHASHI, Daichi <dico.leque.comicron@gmail.com>,
 ;;; All rights reserved.
 ;;;
 ;;; Redistribution and use in source and binary forms, with or without
@@ -167,7 +167,7 @@
             (make-string i #\space)
             (pp-make-tree width i ys)))
     (((i 'flat ($ <pp-break> s)) ys ...)
-     (cons s (pp-make-tree width (+ k 1) ys)))
+     (cons s (pp-make-tree width (+ k (string-width s)) ys)))
     (((i m ($ <pp-string> s w)) ys ...)
      (cons s (pp-make-tree width (+ k w) ys)))
     (((i m (? string? s)) ys ...)
