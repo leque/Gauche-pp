@@ -10,7 +10,9 @@ env:
   - GAUCHE_VERSION=0.9.5
   - GAUCHE_VERSION=0.9.6
 before_install:
-  - sh .travis-gauche.sh
+  - curl -s -o get-gauche.sh https://raw.githubusercontent.com/shirok/get-gauche/master/get-gauche.sh
+  - chmod u+x get-gauche.sh
+  - ./get-gauche.sh --auto --home --version "$GAUCHE_VERSION"
 script:
   - gosh -V
   - ./configure
