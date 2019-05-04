@@ -104,6 +104,9 @@
 (define-method x->pp (obj ctx)
   (write-to-string obj))
 
+(define-method x->pp ((obj <symbol>) ctx)
+  (pp-with-label obj ctx (cut write-to-string obj)))
+
 (define-method x->pp ((obj <list>) ctx)
   (define (list->pp xs)
     (let retry ((smart-indent? #t))
@@ -185,6 +188,10 @@
 
 (define-method pp-scan! (obj ctx)
   #f)
+
+(define-method pp-scan! ((obj <symbol>) ctx)
+  (unless (symbol-interned? obj)
+    (pp-mark! obj ctx (lambda () #f))))
 
 (define-method pp-scan! ((obj <pair>) ctx)
   (pp-mark! obj ctx
