@@ -11,6 +11,9 @@
 (use pp.core)
 (test-module 'pp.core)
 
+(use pp.json)
+(test-module 'pp.json)
+
 (define-syntax test-pp
   (syntax-rules ()
     ((_ (opt ...) expr str)
@@ -23,6 +26,19 @@
             (with-output-to-string
               (lambda ()
                 (pretty-print 'expr opt ...)))))))
+
+(define-syntax test-pp-json
+  (syntax-rules ()
+    ((_ (opt ...) expr str)
+     (test* (format "keys=~S: ~A"
+                    '(opt ...)
+                    (with-output-to-string
+                      (lambda ()
+                        (write/ss 'expr))))
+            str
+            (with-output-to-string
+              (lambda ()
+                (pretty-print-json 'expr opt ...)))))))
 
 (define-syntax test-pp-core
   (syntax-rules ()
@@ -390,6 +406,87 @@
          "(#0=(a) #1=(b) #2=(c) #3=(d) #4=(e) #5=(f) #6=(g) #7=(h) #8=(i) #9=(j) #10=(k) #10# #9# #8# #7# #6# #5# #4# #3# #2# #1# #0#)\n")
 
 ;;-------+---------+---------+---------+---------|---------+---------+---------+
+
+(test-section "pretty-print json")
+
+(test-pp-json (:width 2) #() "\
+[]
+")
+
+(test-pp-json (:width 1) #() "\
+[
+]
+")
+
+(test-pp-json (:width 2) () "\
+{}
+")
+
+(test-pp-json (:width 1) () "\
+{
+}
+")
+
+(test-pp-json () #(1 2 3 4) "[1, 2, 3, 4]\n")
+
+(test-pp-json (:indent #f) #(1 2 3 4) "[1,2,3,4]\n")
+
+(test-pp-json (:width 5) #(1 2 3 4) "\
+[
+  1,
+  2,
+  3,
+  4
+]\n")
+
+(test-pp-json (:indent #f :width 1) #(1 2 3 4) "[1,2,3,4]\n")
+
+(test-pp-json (:width 5)
+              (("a" . 42)
+               ("b" . 0.5))
+              "\
+{
+  \"a\": 42,
+  \"b\": 0.5
+}
+")
+
+(test-pp-json (:indent #f :width 5)
+              (("a" . 42)
+               ("b" . 0.5))
+              "{\"a\":42,\"b\":0.5}\n")
+
+(test-pp-json (:width 20)
+              (("a" . 42)
+               ("b" . #(1 2 3 4 5)))
+              "\
+{
+  \"a\": 42,
+  \"b\": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ]
+}
+")
+
+(test-pp-json (:width 20)
+              (("a" . 42)
+               ("b" . #(1 2 3)))
+              "\
+{
+  \"a\": 42,
+  \"b\": [1, 2, 3]
+}
+")
+;;-------+---------+---------+---------+---------|---------+---------+---------+
+
+(test-pp-json ()
+              "λ\nλ"
+              "\"λ\\nλ\"\n")
+
 
 ;; If you don't want `gosh' to exit with nonzero status even if
 ;; the test fails, pass #f to :exit-on-failure.

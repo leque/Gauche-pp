@@ -26,7 +26,7 @@ LOCAL_PATHS = "@LOCAL_PATHS@"
 PACKAGE   = Gauche-pp
 
 ARCHFILES =
-SCMFILES  = pp.scm pp/core.scm
+SCMFILES  = pp.scm pp/core.scm pp/json.scm
 HEADERS   =
 
 TARGET    = $(ARCHFILES)

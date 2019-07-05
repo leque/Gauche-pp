@@ -20,7 +20,7 @@
 
 ;; Initialize configure.  This creates the global context, parses
 ;; command-line args and sets up default values.
-(cf-init "Gauche-pp" "0.2.0" "dico.leque.comicron@gmail.com")
+(cf-init "Gauche-pp" "0.3.0" "dico.leque.comicron@gmail.com")
 
 ;; Set up gauche related commands.  The commands are set by scanning
 ;; PATH.  You can override them by "GOSH=/my/gosh ./configure" etc.
