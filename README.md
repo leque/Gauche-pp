@@ -4,4 +4,4 @@ A pretty-printer for Gauche Scheme.
 
 ## Requirement
 
-- [Gauche](http://practical-scheme.net/gauche/) 0.9.4 or later
+- [Gauche](http://practical-scheme.net/gauche/) 0.9.5 or later
